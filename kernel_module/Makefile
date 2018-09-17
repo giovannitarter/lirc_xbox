@@ -1,12 +1,25 @@
 
+DRIVER_NAME=xbox_remote
+HEADERS ?= /lib/modules/$(shell uname -r)/build
 
-obj-m += lirc_xbox.o
+obj-m += $(DRIVER_NAME).o
 
-all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+
+all: build install
+
+
+xbox_remote.ko: $(DRIVER_NAME).c
+	make -C $(HEADERS)  M=$(PWD) modules
+
+
+build: $(DRIVER_NAME).ko
+
+
+install:
 	mkdir -p /lib/modules/$$(uname -r)/extra
-	cp lirc_xbox.ko /lib/modules/$$(uname -r)/extra
+	cp $(DRIVER_NAME).ko /lib/modules/$$(uname -r)/extra
 	depmod -a
 
+
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	make -C $(HEADERS) M=$(PWD) clean

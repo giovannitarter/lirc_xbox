@@ -1,10 +1,8 @@
-kernel_module/lirc_xbox.ko
-kernel_module/.lirc_xbox.ko.cmd
-kernel_module/lirc_xbox.mod.c
-kernel_module/lirc_xbox.mod.o
-kernel_module/.lirc_xbox.mod.o.cmd
-kernel_module/lirc_xbox.o
-kernel_module/.lirc_xbox.o.cmd
+*.ko
+*.o
+*.cmd
 kernel_module/modules.order
 kernel_module/Module.symvers
 kernel_module/.tmp_versions
+kernel_module/.cache.mk
+kernel_module/xbox_remote.mod.c
