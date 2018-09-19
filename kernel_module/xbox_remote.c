@@ -779,24 +779,24 @@ static int xbox_remote_initialize(struct xbox_remote *xbox_remote)
 	xbox_remote->irq_urb->transfer_dma = xbox_remote->inbuf_dma;
 	xbox_remote->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-	/* Set up out_urb */
-	pipe = usb_sndintpipe(udev, xbox_remote->endpoint_out->bEndpointAddress);
-	maxp = usb_maxpacket(udev, pipe, usb_pipeout(pipe));
-	maxp = (maxp > DATA_BUFSIZE) ? DATA_BUFSIZE : maxp;
+	///* Set up out_urb */
+	//pipe = usb_sndintpipe(udev, xbox_remote->endpoint_out->bEndpointAddress);
+	//maxp = usb_maxpacket(udev, pipe, usb_pipeout(pipe));
+	//maxp = (maxp > DATA_BUFSIZE) ? DATA_BUFSIZE : maxp;
 
-	usb_fill_int_urb(xbox_remote->out_urb, udev, pipe, xbox_remote->outbuf,
-			 maxp, xbox_remote_irq_out, xbox_remote,
-			 xbox_remote->endpoint_out->bInterval);
-	xbox_remote->out_urb->transfer_dma = xbox_remote->outbuf_dma;
-	xbox_remote->out_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+	//usb_fill_int_urb(xbox_remote->out_urb, udev, pipe, xbox_remote->outbuf,
+	//		 maxp, xbox_remote_irq_out, xbox_remote,
+	//		 xbox_remote->endpoint_out->bInterval);
+	//xbox_remote->out_urb->transfer_dma = xbox_remote->outbuf_dma;
+	//xbox_remote->out_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-	/* send initialization strings */
-	if ((xbox_remote_sendpacket(xbox_remote, 0x8004, init1)) ||
-	    (xbox_remote_sendpacket(xbox_remote, 0x8007, init2))) {
-		dev_err(&xbox_remote->interface->dev,
-			 "Initializing xbox_remote hardware failed.\n");
-		return -EIO;
-	}
+	///* send initialization strings */
+	//if ((xbox_remote_sendpacket(xbox_remote, 0x8004, init1)) ||
+	//    (xbox_remote_sendpacket(xbox_remote, 0x8007, init2))) {
+	//	dev_err(&xbox_remote->interface->dev,
+	//		 "Initializing xbox_remote hardware failed.\n");
+	//	return -EIO;
+	//}
 
 	return 0;
 }
@@ -816,13 +816,13 @@ static int xbox_remote_probe(struct usb_interface *interface,
 	struct rc_dev *rc_dev;
 	int err = -ENOMEM;
 
-	if (iface_host->desc.bNumEndpoints != 2) {
+	if (iface_host->desc.bNumEndpoints != 1) {
 		err("%s: Unexpected desc.bNumEndpoints\n", __func__);
 		return -ENODEV;
 	}
 
 	endpoint_in = &iface_host->endpoint[0].desc;
-	endpoint_out = &iface_host->endpoint[1].desc;
+	//endpoint_out = &iface_host->endpoint[1].desc;
 
 	if (!usb_endpoint_is_int_in(endpoint_in)) {
 		err("%s: Unexpected endpoint_in\n", __func__);
@@ -843,7 +843,7 @@ static int xbox_remote_probe(struct usb_interface *interface,
 		goto exit_free_buffers;
 
 	xbox_remote->endpoint_in = endpoint_in;
-	xbox_remote->endpoint_out = endpoint_out;
+	//xbox_remote->endpoint_out = endpoint_out;
 	xbox_remote->udev = udev;
 	xbox_remote->rdev = rc_dev;
 	xbox_remote->interface = interface;
