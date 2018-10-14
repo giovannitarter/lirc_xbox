@@ -92,6 +92,7 @@
 #include <linux/wait.h>
 #include <linux/jiffies.h>
 #include <media/rc-core.h>
+#include "rc-xbox.h"
 
 /*
  * Module and Version Information, Module Parameters
@@ -117,14 +118,15 @@
  * and we have to take this into account for an accurate repeat
  * behaviour.
  */
-#define FILTER_TIME	60 /* msec */
+#define FILTER_TIME	300 /* msec */
 #define REPEAT_DELAY	500 /* msec */
 
 static unsigned long channel_mask;
 module_param(channel_mask, ulong, 0644);
 MODULE_PARM_DESC(channel_mask, "Bitmask of remote control channels to ignore");
 
-static int debug;
+//static int debug;
+static int debug = 1;
 module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "Enable extra debug messages and information");
 
@@ -136,6 +138,7 @@ static int repeat_delay = REPEAT_DELAY;
 module_param(repeat_delay, int, 0644);
 MODULE_PARM_DESC(repeat_delay, "Delay before sending repeats, default = 500 msec");
 
+//static bool mouse = false;
 static bool mouse = true;
 module_param(mouse, bool, 0444);
 MODULE_PARM_DESC(mouse, "Enable mouse device, default = yes");
@@ -151,57 +154,30 @@ struct xbox_receiver_type {
 	const char *(*get_default_keymap)(struct usb_interface *interface);
 };
 
-static const char *get_medion_keymap(struct usb_interface *interface)
-{
-	struct usb_device *udev = interface_to_usbdev(interface);
+//static const char *get_medion_keymap(struct usb_interface *interface)
+//{
+//	struct usb_device *udev = interface_to_usbdev(interface);
+//	return RC_MAP_XBOX;
+//}
 
-	/*
-	 * There are many different Medion remotes shipped with a receiver
-	 * with the same usb id, but the receivers have subtle differences
-	 * in the USB descriptors allowing us to detect them.
-	 */
-
-	if (udev->manufacturer && udev->product) {
-		if (udev->actconfig->desc.bmAttributes & USB_CONFIG_ATT_WAKEUP) {
-
-			if (!strcmp(udev->manufacturer, "X10 Wireless Technology Inc")
-			    && !strcmp(udev->product, "USB Receiver"))
-				return RC_MAP_MEDION_X10_DIGITAINER;
-
-			if (!strcmp(udev->manufacturer, "X10 WTI")
-			    && !strcmp(udev->product, "RF receiver"))
-				return RC_MAP_MEDION_X10_OR2X;
-		} else {
-
-			 if (!strcmp(udev->manufacturer, "X10 Wireless Technology Inc")
-			    && !strcmp(udev->product, "USB Receiver"))
-				return RC_MAP_MEDION_X10;
-		}
-	}
-
-	dev_info(&interface->dev,
-		 "Unknown Medion X10 receiver, using default xbox_remote Medion keymap\n");
-
-	return RC_MAP_MEDION_X10;
-}
-
-static const struct xbox_receiver_type type_ati		= {
-	.default_keymap = RC_MAP_ATI_X10
+static const struct xbox_receiver_type type_xbox	= {
+	.default_keymap = RC_MAP_XBOX
 };
-static const struct xbox_receiver_type type_medion	= {
-	.get_default_keymap = get_medion_keymap
-};
-static const struct xbox_receiver_type type_firefly	= {
-	.default_keymap = RC_MAP_SNAPSTREAM_FIREFLY
-};
+
 
 static const struct usb_device_id xbox_remote_table[] = {
 	
     /* Gamester Xbox DVD Movie Playback Kit IR */
-	{ USB_DEVICE(VENDOR_MS1, 0x6521) },
+	{
+        USB_DEVICE(VENDOR_MS1, 0x6521),
+        .driver_info = (unsigned long)&type_xbox     
+    },
 
 	/* Microsoft Xbox DVD Movie Playback Kit IR */
-	{ USB_DEVICE(VENDOR_MS2, 0x0284) },
+	{ 
+        USB_DEVICE(VENDOR_MS2, 0x0284),
+        .driver_info = (unsigned long)&type_xbox
+    }, 
 
 	/*
 	 * Some Chinese manufacturer -- conflicts with the joystick from the
@@ -223,8 +199,8 @@ MODULE_DEVICE_TABLE(usb, xbox_remote_table);
 #define SEND_FLAG_COMPLETE	2
 
 /* Device initialization strings */
-static char init1[] = { 0x01, 0x00, 0x20, 0x14 };
-static char init2[] = { 0x01, 0x00, 0x20, 0x14, 0x20, 0x20, 0x20 };
+//static char init1[] = { 0x01, 0x00, 0x20, 0x14 };
+//static char init2[] = { 0x01, 0x00, 0x20, 0x14, 0x20, 0x20, 0x20 };
 
 struct xbox_remote {
 	struct input_dev *idev;
@@ -311,8 +287,9 @@ static void xbox_remote_dump(struct device *dev, unsigned char *data,
 			dev_warn(dev, "Weird byte 0x%02x\n", data[0]);
 	} else if (len == 4)
 		dev_warn(dev, "Weird key %*ph\n", 4, data);
-	else
-		dev_warn(dev, "Weird data, len=%d %*ph ...\n", len, 6, data);
+	else {
+		//dev_warn(dev, "Weird data, len=%d %*ph ...\n", len, 6, data);
+    }
 }
 
 /*
@@ -374,57 +351,57 @@ static void xbox_remote_rc_close(struct rc_dev *rdev)
 	xbox_remote_close(xbox_remote);
 }
 
-/*
- * xbox_remote_irq_out
- */
-static void xbox_remote_irq_out(struct urb *urb)
-{
-	struct xbox_remote *xbox_remote = urb->context;
+///*
+// * xbox_remote_irq_out
+// */
+//static void xbox_remote_irq_out(struct urb *urb)
+//{
+//	struct xbox_remote *xbox_remote = urb->context;
+//
+//	if (urb->status) {
+//		dev_dbg(&xbox_remote->interface->dev, "%s: status %d\n",
+//			__func__, urb->status);
+//		return;
+//	}
+//
+//	xbox_remote->send_flags |= SEND_FLAG_COMPLETE;
+//	wmb();
+//	wake_up(&xbox_remote->wait);
+//}
 
-	if (urb->status) {
-		dev_dbg(&xbox_remote->interface->dev, "%s: status %d\n",
-			__func__, urb->status);
-		return;
-	}
-
-	xbox_remote->send_flags |= SEND_FLAG_COMPLETE;
-	wmb();
-	wake_up(&xbox_remote->wait);
-}
-
-/*
- * xbox_remote_sendpacket
- *
- * Used to send device initialization strings
- */
-static int xbox_remote_sendpacket(struct xbox_remote *xbox_remote, u16 cmd,
-	unsigned char *data)
-{
-	int retval = 0;
-
-	/* Set up out_urb */
-	memcpy(xbox_remote->out_urb->transfer_buffer + 1, data, LO(cmd));
-	((char *) xbox_remote->out_urb->transfer_buffer)[0] = HI(cmd);
-
-	xbox_remote->out_urb->transfer_buffer_length = LO(cmd) + 1;
-	xbox_remote->out_urb->dev = xbox_remote->udev;
-	xbox_remote->send_flags = SEND_FLAG_IN_PROGRESS;
-
-	retval = usb_submit_urb(xbox_remote->out_urb, GFP_ATOMIC);
-	if (retval) {
-		dev_dbg(&xbox_remote->interface->dev,
-			 "sendpacket: usb_submit_urb failed: %d\n", retval);
-		return retval;
-	}
-
-	wait_event_timeout(xbox_remote->wait,
-		((xbox_remote->out_urb->status != -EINPROGRESS) ||
-			(xbox_remote->send_flags & SEND_FLAG_COMPLETE)),
-		HZ);
-	usb_kill_urb(xbox_remote->out_urb);
-
-	return retval;
-}
+///*
+// * xbox_remote_sendpacket
+// *
+// * Used to send device initialization strings
+// */
+//static int xbox_remote_sendpacket(struct xbox_remote *xbox_remote, u16 cmd,
+//	unsigned char *data)
+//{
+//	int retval = 0;
+//
+//	/* Set up out_urb */
+//	memcpy(xbox_remote->out_urb->transfer_buffer + 1, data, LO(cmd));
+//	((char *) xbox_remote->out_urb->transfer_buffer)[0] = HI(cmd);
+//
+//	xbox_remote->out_urb->transfer_buffer_length = LO(cmd) + 1;
+//	xbox_remote->out_urb->dev = xbox_remote->udev;
+//	xbox_remote->send_flags = SEND_FLAG_IN_PROGRESS;
+//
+//	retval = usb_submit_urb(xbox_remote->out_urb, GFP_ATOMIC);
+//	if (retval) {
+//		dev_dbg(&xbox_remote->interface->dev,
+//			 "sendpacket: usb_submit_urb failed: %d\n", retval);
+//		return retval;
+//	}
+//
+//	wait_event_timeout(xbox_remote->wait,
+//		((xbox_remote->out_urb->status != -EINPROGRESS) ||
+//			(xbox_remote->send_flags & SEND_FLAG_COMPLETE)),
+//		HZ);
+//	usb_kill_urb(xbox_remote->out_urb);
+//
+//	return retval;
+//}
 
 struct accel_times {
 	const char	value;
@@ -441,34 +418,34 @@ static const struct accel_times accel[] = {
 	{ 20,    0 },
 };
 
-/*
- * xbox_remote_compute_accel
- *
- * Implements acceleration curve for directional control pad
- * If elapsed time since last event is > 1/4 second, user "stopped",
- * so reset acceleration. Otherwise, user is probably holding the control
- * pad down, so we increase acceleration, ramping up over two seconds to
- * a maximum speed.
- */
-static int xbox_remote_compute_accel(struct xbox_remote *xbox_remote)
-{
-	unsigned long now = jiffies, reset_time;
-	int i;
-
-	reset_time = msecs_to_jiffies(250);
-
-	if (time_after(now, xbox_remote->old_jiffies + reset_time)) {
-		xbox_remote->acc_jiffies = now;
-		return 1;
-	}
-	for (i = 0; i < ARRAY_SIZE(accel) - 1; i++) {
-		unsigned long timeout = msecs_to_jiffies(accel[i].msecs);
-
-		if (time_before(now, xbox_remote->acc_jiffies + timeout))
-			return accel[i].value;
-	}
-	return accel[i].value;
-}
+///*
+// * xbox_remote_compute_accel
+// *
+// * Implements acceleration curve for directional control pad
+// * If elapsed time since last event is > 1/4 second, user "stopped",
+// * so reset acceleration. Otherwise, user is probably holding the control
+// * pad down, so we increase acceleration, ramping up over two seconds to
+// * a maximum speed.
+// */
+//static int xbox_remote_compute_accel(struct xbox_remote *xbox_remote)
+//{
+//	unsigned long now = jiffies, reset_time;
+//	int i;
+//
+//	reset_time = msecs_to_jiffies(250);
+//
+//	if (time_after(now, xbox_remote->old_jiffies + reset_time)) {
+//		xbox_remote->acc_jiffies = now;
+//		return 1;
+//	}
+//	for (i = 0; i < ARRAY_SIZE(accel) - 1; i++) {
+//		unsigned long timeout = msecs_to_jiffies(accel[i].msecs);
+//
+//		if (time_before(now, xbox_remote->acc_jiffies + timeout))
+//			return accel[i].value;
+//	}
+//	return accel[i].value;
+//}
 
 /*
  * xbox_remote_report_input
@@ -484,96 +461,96 @@ static void xbox_remote_input_report(struct urb *urb)
 	u32 wheel_keycode = KEY_RESERVED;
 	int i;
 
-	/*
-	 * data[0] = 0x14
-	 * data[1] = data[2] + data[3] + 0xd5 (a checksum byte)
-	 * data[2] = the key code (with toggle bit in MSB with some models)
-	 * data[3] = channel << 4 (the low 4 bits must be zero)
-	 */
-
 	/* Deal with strange looking inputs */
-	if ( urb->actual_length != 4 || data[0] != 0x14 ||
-	     data[1] != (unsigned char)(data[2] + data[3] + 0xD5) ||
-	     (data[3] & 0x0f) != 0x00) {
+	if (urb->actual_length != 6 
+        || data[0] != 0x00
+	    ||  data[1] != 0x06
+	    ||  data[3] != 0x0a
+       )
+    {
 		xbox_remote_dump(&urb->dev->dev, data, urb->actual_length);
 		return;
 	}
+        
+	xbox_remote_dump(&urb->dev->dev, data, urb->actual_length);
+    scancode = data[2];
 
-	if (data[1] != ((data[2] + data[3] + 0xd5) & 0xff)) {
-		dbginfo(&xbox_remote->interface->dev,
-			"wrong checksum in input: %*ph\n", 4, data);
-		return;
-	}
+    unsigned long now = jiffies;
+	
+    dbginfo(
+            &xbox_remote->interface->dev,
+		    "time: %lu key data %02x, scancode %02x\n",
+            jiffies_to_msecs(now),
+            data[2], 
+            scancode
+           );
 
-	/* Mask unwanted remote channels.  */
-	/* note: remote_num is 0-based, channel 1 on remote == 0 here */
-	remote_num = (data[3] >> 4) & 0x0f;
-	if (channel_mask & (1 << (remote_num + 1))) {
-		dbginfo(&xbox_remote->interface->dev,
-			"Masked input from channel 0x%02x: data %02x, mask= 0x%02lx\n",
-			remote_num, data[2], channel_mask);
-		return;
-	}
+    //dbginfo(&xbox_remote->interface->dev, "index: %d", index);
+        
+    if (index < 0) {
+	   
+        //dbginfo(&xbox_remote->interface->dev, 
+        //        "status: data: %02X | old_data: %02X", 
+        //        data[2], xbox_remote->old_data
+        //        );
+        //
+        //dbginfo(&xbox_remote->interface->dev, 
+        //        "status: now: %lu | next jff: %lu", 
+        //        now, xbox_remote->old_jiffies + msecs_to_jiffies(repeat_filter)
+        //        );
+        //
+        //
+        //dbginfo(&xbox_remote->interface->dev, 
+        //        "status: old: %lu | flt: %lu", 
+        //        now, xbox_remote->old_jiffies,  msecs_to_jiffies(repeat_filter)
+        //        );
 
-	/*
-	 * MSB is a toggle code, though only used by some devices
-	 * (e.g. SnapStream Firefly)
-	 */
-	scancode = data[2] & 0x7f;
-
-	dbginfo(&xbox_remote->interface->dev,
-		"channel 0x%02x; key data %02x, scancode %02x\n",
-		remote_num, data[2], scancode);
-
-	if (scancode >= 0x70) {
-		/*
-		 * This is either a mouse or scrollwheel event, depending on
-		 * the remote/keymap.
-		 * Get the keycode assigned to scancode 0x78/0x70. If it is
-		 * set, assume this is a scrollwheel up/down event.
-		 */
-		wheel_keycode = rc_g_keycode_from_table(xbox_remote->rdev,
-							scancode & 0x78);
-
-		if (wheel_keycode == KEY_RESERVED) {
-			/* scrollwheel was not mapped, assume mouse */
-
-			/* Look up event code index in the mouse translation
-			 * table.
-			 */
-			for (i = 0; xbox_remote_tbl[i].kind != KIND_END; i++) {
-				if (scancode == xbox_remote_tbl[i].data) {
-					index = i;
-					break;
-				}
-			}
-		}
-	}
-
-	if (index >= 0 && xbox_remote_tbl[index].kind == KIND_LITERAL) {
-		/*
-		 * The lsbit of the raw key code is a down/up flag.
-		 * Invert it to match the input layer's conventions.
-		 */
-		input_event(dev, EV_KEY, xbox_remote_tbl[index].code,
-			!(data[2] & 1));
-
-		xbox_remote->old_jiffies = jiffies;
-
-	} else if (index < 0 || xbox_remote_tbl[index].kind == KIND_FILTERED) {
-		unsigned long now = jiffies;
-
-		/* Filter duplicate events which happen "too close" together. */
+        //if data is the old one 
+        //and
+        //now is before old_time + repeat filter
 		if (xbox_remote->old_data == data[2] &&
 		    time_before(now, xbox_remote->old_jiffies +
-				     msecs_to_jiffies(repeat_filter))) {
+				     msecs_to_jiffies(repeat_filter))) 
+        {
 			xbox_remote->repeat_count++;
-		} else {
+            //dbginfo(&xbox_remote->interface->dev, "filtering %d", xbox_remote->repeat_count);
+		} 
+        else {
 			xbox_remote->repeat_count = 0;
+			xbox_remote->old_jiffies = now;
 			xbox_remote->first_jiffies = now;
+			xbox_remote->old_data = data[2];
+            //dbginfo(&xbox_remote->interface->dev, "passing");
 		}
 
-		xbox_remote->old_jiffies = now;
+
+
+
+
+
+
+//        //dbginfo(&xbox_remote->interface->dev, "filtering");
+//        
+//
+//		/* Filter duplicate events which happen "too close" together. */
+//		if (xbox_remote->old_data == data[2] &&
+//		    time_before(now, xbox_remote->old_jiffies +
+//				     msecs_to_jiffies(repeat_filter))) 
+//        {
+//			xbox_remote->repeat_count++;
+//            dbginfo(&xbox_remote->interface->dev, "filtering");
+//		} 
+//        else {
+//			xbox_remote->repeat_count = 0;
+//			//xbox_remote->first_jiffies = now;
+//			xbox_remote->old_jiffies = now;
+//			xbox_remote->old_data = data[2];
+//            dbginfo(&xbox_remote->interface->dev, "passing");
+//		}
+//        
+        //dbginfo(&xbox_remote->interface->dev, "now: %d", now);
+
+		//xbox_remote->old_jiffies = now;
 
 		/* Ensure we skip at least the 4 first duplicate events
 		 * (generated by a single keypress), and continue skipping
@@ -585,63 +562,155 @@ static void xbox_remote_input_report(struct urb *urb)
 				      msecs_to_jiffies(repeat_delay))))
 			return;
 
-		if (index >= 0) {
-			input_event(dev, EV_KEY, xbox_remote_tbl[index].code, 1);
-			input_event(dev, EV_KEY, xbox_remote_tbl[index].code, 0);
-		} else {
-			/* Not a mouse event, hand it to rc-core. */
-			int count = 1;
+		//if (index >= 0) {
+		//if (index >= 0) {
+			//input_event(dev, EV_KEY, xbox_remote_tbl[index].code, 1);
+			//input_event(dev, EV_KEY, xbox_remote_tbl[index].code, 0);
+			
+            
+        //    dbginfo(&xbox_remote->interface->dev, "input event: %x", scancode);
+        //    dbginfo(&xbox_remote->interface->dev, "dev: %p", dev);
 
-			if (wheel_keycode != KEY_RESERVED) {
-				/*
-				 * This is a scrollwheel event, send the
-				 * scroll up (0x78) / down (0x70) scancode
-				 * repeatedly as many times as indicated by
-				 * rest of the scancode.
-				 */
-				count = (scancode & 0x07) + 1;
-				scancode &= 0x78;
-			}
-
-			while (count--) {
-				/*
-				* We don't use the rc-core repeat handling yet as
-				* it would cause ghost repeats which would be a
-				* regression for this driver.
-				*/
-				rc_keydown_notimeout(xbox_remote->rdev,
+		//}
+        
+        //input_event(dev, EV_KEY, scancode, 1);
+		//input_event(dev, EV_KEY, scancode, 0);
+        
+        rc_keydown_notimeout(xbox_remote->rdev,
 						     RC_PROTO_OTHER,
 						     scancode, data[2]);
-				rc_keyup(xbox_remote->rdev);
-			}
-			goto nosync;
-		}
-
-	} else if (xbox_remote_tbl[index].kind == KIND_ACCEL) {
-		signed char dx = xbox_remote_tbl[index].code >> 8;
-		signed char dy = xbox_remote_tbl[index].code & 255;
-
-		/*
-		 * Other event kinds are from the directional control pad, and
-		 * have an acceleration factor applied to them.  Without this
-		 * acceleration, the control pad is mostly unusable.
-		 */
-		int acc = xbox_remote_compute_accel(xbox_remote);
-		if (dx)
-			input_report_rel(dev, REL_X, dx * acc);
-		if (dy)
-			input_report_rel(dev, REL_Y, dy * acc);
-		xbox_remote->old_jiffies = jiffies;
-
-	} else {
-		dev_dbg(&xbox_remote->interface->dev, "xbox_remote kind=%d\n",
-			xbox_remote_tbl[index].kind);
-		return;
-	}
-	input_sync(dev);
-nosync:
-	xbox_remote->old_data = data[2];
+		rc_keyup(xbox_remote->rdev);
+    }
+	
+    input_sync(dev);
 }
+
+	//if (scancode >= 0x70) {
+	//	/*
+	//	 * This is either a mouse or scrollwheel event, depending on
+	//	 * the remote/keymap.
+	//	 * Get the keycode assigned to scancode 0x78/0x70. If it is
+	//	 * set, assume this is a scrollwheel up/down event.
+	//	 */
+	//	wheel_keycode = rc_g_keycode_from_table(xbox_remote->rdev,
+	//						scancode & 0x78);
+
+	//	if (wheel_keycode == KEY_RESERVED) {
+	//		/* scrollwheel was not mapped, assume mouse */
+
+	//		/* Look up event code index in the mouse translation
+	//		 * table.
+	//		 */
+	//		for (i = 0; xbox_remote_tbl[i].kind != KIND_END; i++) {
+	//			if (scancode == xbox_remote_tbl[i].data) {
+	//				index = i;
+	//				break;
+	//			}
+	//		}
+	//	}
+	//}
+
+	//if (index >= 0 && xbox_remote_tbl[index].kind == KIND_LITERAL) {
+	//	/*
+	//	 * The lsbit of the raw key code is a down/up flag.
+	//	 * Invert it to match the input layer's conventions.
+	//	 */
+	//	input_event(dev, EV_KEY, xbox_remote_tbl[index].code,
+	//		!(data[2] & 1));
+
+	//	xbox_remote->old_jiffies = jiffies;
+
+	//} else
+
+    //    //if (index < 0 || xbox_remote_tbl[index].kind == KIND_FILTERED) {
+    //    if (index < 0) {
+	//	unsigned long now = jiffies;
+
+	//	/* Filter duplicate events which happen "too close" together. */
+	//	if (xbox_remote->old_data == data[2] &&
+	//	    time_before(now, xbox_remote->old_jiffies +
+	//			     msecs_to_jiffies(repeat_filter))) {
+	//		xbox_remote->repeat_count++;
+	//	} else {
+	//		xbox_remote->repeat_count = 0;
+	//		xbox_remote->first_jiffies = now;
+	//	}
+
+	//	xbox_remote->old_jiffies = now;
+
+	//	/* Ensure we skip at least the 4 first duplicate events
+	//	 * (generated by a single keypress), and continue skipping
+	//	 * until repeat_delay msecs have passed.
+	//	 */
+	//	if (xbox_remote->repeat_count > 0 &&
+	//	    (xbox_remote->repeat_count < 5 ||
+	//	     time_before(now, xbox_remote->first_jiffies +
+	//			      msecs_to_jiffies(repeat_delay))))
+	//		return;
+
+	//	if (index >= 0) {
+	//		//input_event(dev, EV_KEY, xbox_remote_tbl[index].code, 1);
+	//		//input_event(dev, EV_KEY, xbox_remote_tbl[index].code, 0);
+	//		input_event(dev, EV_KEY, scancode, 1);
+	//		input_event(dev, EV_KEY, scancode, 0);
+	//	}
+    //    
+    //    }
+    //    
+//        //MOUSE
+//        //######################################################
+//
+//        else {
+//			/* Not a mouse event, hand it to rc-core. */
+//			int count = 1;
+//
+//			if (wheel_keycode != KEY_RESERVED) {
+//				/*
+//				 * This is a scrollwheel event, send the
+//				 * scroll up (0x78) / down (0x70) scancode
+//				 * repeatedly as many times as indicated by
+//				 * rest of the scancode.
+//				 */
+//				count = (scancode & 0x07) + 1;
+//				scancode &= 0x78;
+//			}
+//
+//			while (count--) {
+//				/*
+//				* We don't use the rc-core repeat handling yet as
+//				* it would cause ghost repeats which would be a
+//				* regression for this driver.
+//				*/
+//				rc_keydown_notimeout(xbox_remote->rdev,
+//						     RC_PROTO_OTHER,
+//						     scancode, data[2]);
+//				rc_keyup(xbox_remote->rdev);
+//			}
+//			goto nosync;
+//		}
+//
+//	} else if (xbox_remote_tbl[index].kind == KIND_ACCEL) {
+//		signed char dx = xbox_remote_tbl[index].code >> 8;
+//		signed char dy = xbox_remote_tbl[index].code & 255;
+//
+//		/*
+//		 * Other event kinds are from the directional control pad, and
+//		 * have an acceleration factor applied to them.  Without this
+//		 * acceleration, the control pad is mostly unusable.
+//		 */
+//		int acc = xbox_remote_compute_accel(xbox_remote);
+//		if (dx)
+//			input_report_rel(dev, REL_X, dx * acc);
+//		if (dy)
+//			input_report_rel(dev, REL_Y, dy * acc);
+//		xbox_remote->old_jiffies = jiffies;
+//
+//	} else {
+//		dev_dbg(&xbox_remote->interface->dev, "xbox_remote kind=%d\n",
+//			xbox_remote_tbl[index].kind);
+//		return;
+//	}
+    
 
 /*
  * xbox_remote_irq_in
@@ -869,7 +938,7 @@ static int xbox_remote_probe(struct usb_interface *interface,
 	snprintf(xbox_remote->mouse_name, sizeof(xbox_remote->mouse_name),
 		 "%s mouse", xbox_remote->rc_name);
 
-	rc_dev->map_name = RC_MAP_ATI_X10; /* default map */
+	rc_dev->map_name = RC_MAP_XBOX; /* default map */
 
 	/* set default keymap according to receiver model */
 	if (type) {
