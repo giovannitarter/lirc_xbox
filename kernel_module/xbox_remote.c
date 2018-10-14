@@ -92,7 +92,7 @@
 #include <linux/wait.h>
 #include <linux/jiffies.h>
 #include <media/rc-core.h>
-#include "rc-xbox.h"
+#include "xbox_remote_keymap.h"
 
 /*
  * Module and Version Information, Module Parameters

@@ -1,8 +1,11 @@
 *.ko
 *.o
 *.cmd
-kernel_module/modules.order
-kernel_module/Module.symvers
-kernel_module/.tmp_versions
-kernel_module/.cache.mk
-kernel_module/xbox_remote.mod.c
+*.mod.c
+*.order
+*.symvers
+*.mk
+.tmp_versions
+
+
+
