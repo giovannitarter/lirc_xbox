@@ -3,12 +3,16 @@
 
 #HEADERS_DIR="/home/pupillo/uarchlinux/linux_kernel/linux-4.18.8"
 
-HEADERS_DIR="/lib/modules/4.15.0-36-generic/build/"
+if [ -z "$HEADERS" ];
+then
+    HEADERS="/lib/modules/$(uname -r)/build/"
+fi
+
 export HEADERS
 
 pushd kernel_module
 make clean
-make build HEADERS=$HEADERS_DIR
+make build 
 RES="$?"
 popd
 
@@ -20,7 +24,7 @@ fi
 
 pushd xbox_remote_keymap
 make clean
-make build HEADERS=$HEADERS_DIR
+make build
 RES="$?"
 popd
 
