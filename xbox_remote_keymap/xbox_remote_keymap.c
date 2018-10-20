@@ -9,7 +9,7 @@ static struct rc_map_table xbox[] = {
     { 0xa6, KEY_UP },
     { 0xa8, KEY_RIGHT },
     { 0xa7, KEY_DOWN },
-    { 0x0b, KEY_SELECT },
+    { 0x0b, KEY_ENTER },
     { 0xce, KEY_1 },
     { 0xcd, KEY_2 },
     { 0xcc, KEY_3 },
@@ -58,4 +58,4 @@ module_init(init_rc_map_xbox)
 module_exit(exit_rc_map_xbox)
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Anssi Hannula <anssi.hannula@iki.fi>");
+MODULE_AUTHOR("Giovanni Tarter <giovanni.tarter@gmail.com>");

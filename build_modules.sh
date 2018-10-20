@@ -10,9 +10,10 @@ fi
 
 export HEADERS
 
-pushd kernel_module
+pushd xbox_remote
 make clean
-make build 
+#make build 
+make
 RES="$?"
 popd
 
@@ -24,7 +25,8 @@ fi
 
 pushd xbox_remote_keymap
 make clean
-make build
+#make build
+make
 RES="$?"
 popd
 

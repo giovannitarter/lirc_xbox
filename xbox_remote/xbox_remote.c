@@ -885,10 +885,14 @@ static int xbox_remote_probe(struct usb_interface *interface,
 	struct rc_dev *rc_dev;
 	int err = -ENOMEM;
 
+	 __request_module(1, "xbox_remote_keymap");
+
 	if (iface_host->desc.bNumEndpoints != 1) {
 		err("%s: Unexpected desc.bNumEndpoints\n", __func__);
 		return -ENODEV;
 	}
+
+	
 
 	endpoint_in = &iface_host->endpoint[0].desc;
 	//endpoint_out = &iface_host->endpoint[1].desc;
