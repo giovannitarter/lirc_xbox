@@ -5,15 +5,23 @@
 
 if [ -z "$HEADERS" ];
 then
+    
     HEADERS="/lib/modules/$(uname -r)/build/"
+    export HEADERS
+    
+    INSTALL_MOD="1"
 fi
 
-export HEADERS
 
 pushd xbox_remote
 make clean
 #make build 
-make
+if [ "$INSTALL_MOD" = "1" ];
+then
+    make
+else
+    make build
+fi
 RES="$?"
 popd
 
@@ -25,8 +33,12 @@ fi
 
 pushd xbox_remote_keymap
 make clean
-#make build
-make
+if [ "$INSTALL_MOD" = "1" ];
+then
+    make
+else
+    make build
+fi
 RES="$?"
 popd
 
@@ -39,16 +51,5 @@ fi
 rm -rf output
 mkdir -p output
 find . -name "*.ko" -exec cp {} output \;
-
-
-
-
-
-
-
-
-
-
-
 
 
