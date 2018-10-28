@@ -137,19 +137,14 @@ MODULE_DEVICE_TABLE(usb, xbox_remote_table);
 #define SEND_FLAG_COMPLETE  2
 
 struct xbox_remote {
-    struct input_dev *idev;
     struct rc_dev *rdev;
     struct usb_device *udev;
     struct usb_interface *interface;
 
     struct urb *irq_urb;
-    struct urb *out_urb;
     struct usb_endpoint_descriptor *endpoint_in;
-    struct usb_endpoint_descriptor *endpoint_out;
     unsigned char *inbuf;
-    unsigned char *outbuf;
     dma_addr_t inbuf_dma;
-    dma_addr_t outbuf_dma;
 
     unsigned char old_data;     /* Detect duplicate events */
     unsigned long old_jiffies;
@@ -220,17 +215,6 @@ static void xbox_remote_close(struct xbox_remote *xbox_remote)
     mutex_unlock(&xbox_remote->open_mutex);
 }
 
-static int xbox_remote_input_open(struct input_dev *inputdev)
-{
-    struct xbox_remote *xbox_remote = input_get_drvdata(inputdev);
-    return xbox_remote_open(xbox_remote);
-}
-
-static void xbox_remote_input_close(struct input_dev *inputdev)
-{
-    struct xbox_remote *xbox_remote = input_get_drvdata(inputdev);
-    xbox_remote_close(xbox_remote);
-}
 
 static int xbox_remote_rc_open(struct rc_dev *rdev)
 {
@@ -253,7 +237,6 @@ static void xbox_remote_input_report(struct urb *urb)
 {
     struct xbox_remote *xbox_remote = urb->context;
     unsigned char *data= xbox_remote->inbuf;
-    struct input_dev *dev = xbox_remote->idev;
     int index = -1;
     int remote_num;
     unsigned char scancode;
@@ -316,7 +299,11 @@ static void xbox_remote_input_report(struct urb *urb)
         rc_keyup(xbox_remote->rdev);
     }
     
-    input_sync(dev);
+    dbginfo(
+            &xbox_remote->interface->dev,
+            "end"
+           );
+    //input_sync(dev);
 }
 
 
@@ -363,17 +350,8 @@ static int xbox_remote_alloc_buffers(struct usb_device *udev,
     if (!xbox_remote->inbuf)
         return -1;
 
-    xbox_remote->outbuf = usb_alloc_coherent(udev, DATA_BUFSIZE, GFP_ATOMIC,
-                        &xbox_remote->outbuf_dma);
-    if (!xbox_remote->outbuf)
-        return -1;
-
     xbox_remote->irq_urb = usb_alloc_urb(0, GFP_KERNEL);
     if (!xbox_remote->irq_urb)
-        return -1;
-
-    xbox_remote->out_urb = usb_alloc_urb(0, GFP_KERNEL);
-    if (!xbox_remote->out_urb)
         return -1;
 
     return 0;
@@ -385,29 +363,11 @@ static int xbox_remote_alloc_buffers(struct usb_device *udev,
 static void xbox_remote_free_buffers(struct xbox_remote *xbox_remote)
 {
     usb_free_urb(xbox_remote->irq_urb);
-    usb_free_urb(xbox_remote->out_urb);
 
     usb_free_coherent(xbox_remote->udev, DATA_BUFSIZE,
         xbox_remote->inbuf, xbox_remote->inbuf_dma);
-
-    usb_free_coherent(xbox_remote->udev, DATA_BUFSIZE,
-        xbox_remote->outbuf, xbox_remote->outbuf_dma);
 }
 
-static void xbox_remote_input_init(struct xbox_remote *xbox_remote)
-{
-    struct input_dev *idev = xbox_remote->idev;
-
-    idev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REL);
-
-    input_set_drvdata(idev, xbox_remote);
-
-    idev->open = xbox_remote_input_open;
-    idev->close = xbox_remote_input_close;
-
-    usb_to_input_id(xbox_remote->udev, &idev->id);
-    idev->dev.parent = &xbox_remote->interface->dev;
-}
 
 static void xbox_remote_rc_init(struct xbox_remote *xbox_remote)
 {
@@ -445,25 +405,6 @@ static int xbox_remote_initialize(struct xbox_remote *xbox_remote)
     xbox_remote->irq_urb->transfer_dma = xbox_remote->inbuf_dma;
     xbox_remote->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-    ///* Set up out_urb */
-    //pipe = usb_sndintpipe(udev, xbox_remote->endpoint_out->bEndpointAddress);
-    //maxp = usb_maxpacket(udev, pipe, usb_pipeout(pipe));
-    //maxp = (maxp > DATA_BUFSIZE) ? DATA_BUFSIZE : maxp;
-
-    //usb_fill_int_urb(xbox_remote->out_urb, udev, pipe, xbox_remote->outbuf,
-    //       maxp, xbox_remote_irq_out, xbox_remote,
-    //       xbox_remote->endpoint_out->bInterval);
-    //xbox_remote->out_urb->transfer_dma = xbox_remote->outbuf_dma;
-    //xbox_remote->out_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
-
-    ///* send initialization strings */
-    //if ((xbox_remote_sendpacket(xbox_remote, 0x8004, init1)) ||
-    //    (xbox_remote_sendpacket(xbox_remote, 0x8007, init2))) {
-    //  dev_err(&xbox_remote->interface->dev,
-    //       "Initializing xbox_remote hardware failed.\n");
-    //  return -EIO;
-    //}
-
     return 0;
 }
 
@@ -475,9 +416,8 @@ static int xbox_remote_probe(struct usb_interface *interface,
 {
     struct usb_device *udev = interface_to_usbdev(interface);
     struct usb_host_interface *iface_host = interface->cur_altsetting;
-    struct usb_endpoint_descriptor *endpoint_in, *endpoint_out;
+    struct usb_endpoint_descriptor *endpoint_in;
     struct xbox_remote *xbox_remote;
-    struct input_dev *input_dev;
     struct rc_dev *rc_dev;
     int err = -ENOMEM;
 
@@ -493,7 +433,6 @@ static int xbox_remote_probe(struct usb_interface *interface,
     }
 
     endpoint_in = &iface_host->endpoint[0].desc;
-    //endpoint_out = &iface_host->endpoint[1].desc;
 
     if (!usb_endpoint_is_int_in(endpoint_in)) {
         err("%s: Unexpected endpoint_in\n", __func__);
@@ -514,7 +453,6 @@ static int xbox_remote_probe(struct usb_interface *interface,
         goto exit_free_buffers;
 
     xbox_remote->endpoint_in = endpoint_in;
-    //xbox_remote->endpoint_out = endpoint_out;
     xbox_remote->udev = udev;
     xbox_remote->rdev = rc_dev;
     xbox_remote->interface = interface;
@@ -548,30 +486,15 @@ static int xbox_remote_probe(struct usb_interface *interface,
     if (err)
         goto exit_kill_urbs;
     
-    input_dev = input_allocate_device();
-    if (!input_dev) {
-        err = -ENOMEM;
-        goto exit_unregister_device;
-    }
-
-    xbox_remote->idev = input_dev;
-    xbox_remote_input_init(xbox_remote);
-    err = input_register_device(input_dev);
-
-    if (err)
-        goto exit_free_input_device;
-
     usb_set_intfdata(interface, xbox_remote);
     return 0;
 
- exit_free_input_device:
-    input_free_device(input_dev);
- exit_unregister_device:
+ 
+exit_unregister_device:
     rc_unregister_device(rc_dev);
     rc_dev = NULL;
  exit_kill_urbs:
     usb_kill_urb(xbox_remote->irq_urb);
-    usb_kill_urb(xbox_remote->out_urb);
  exit_free_buffers:
     xbox_remote_free_buffers(xbox_remote);
  exit_free_dev_rdev:
@@ -595,9 +518,6 @@ static void xbox_remote_disconnect(struct usb_interface *interface)
     }
 
     usb_kill_urb(xbox_remote->irq_urb);
-    usb_kill_urb(xbox_remote->out_urb);
-    if (xbox_remote->idev)
-        input_unregister_device(xbox_remote->idev);
     rc_unregister_device(xbox_remote->rdev);
     xbox_remote_free_buffers(xbox_remote);
     kfree(xbox_remote);
